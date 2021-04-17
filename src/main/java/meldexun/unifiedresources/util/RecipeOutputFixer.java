@@ -31,7 +31,7 @@ public abstract class RecipeOutputFixer {
 			return RECIPE_CLASS_2_RECIPE_OUTPUT_FIXERS.get(classToCheck);
 		}
 		ArrayList<RecipeOutputFixer> list = new ArrayList<>();
-		if (classToCheck == Object.class) {
+		if (classToCheck != Object.class) {
 			for (Field field : classToCheck.getDeclaredFields()) {
 				RecipeOutputFixer recipeOutputFixer = RecipeOutputFixerList.create(field);
 				if (recipeOutputFixer != null) {
