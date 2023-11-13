@@ -1,11 +1,10 @@
 modLoader="javafml"
-loaderVersion="[35,)"
-license="All rights reserved"
-issueTrackerURL="https://github.com/Meldexun/UnifiedResources/issues"
+loaderVersion="${mod_loader_version_range}"
+license="${mod_license}"
+issueTrackerURL="${mod_issue_tracker}"
 [[mods]]
-modId="unified_resources"
-version="1.0.2"
-displayName="Unified Resources"
-authors="Meldexun"
-description='''
-'''
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+authors="${mod_authors}"
+description=''''''
