@@ -71,7 +71,7 @@ public abstract class RecipeOutputFixer {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-		} else if (type.isArray()) {
+		} else if (type.isArray() && !type.getComponentType().isPrimitive()) {
 			try {
 				field.setAccessible(true);
 				return new RecipeOutputFixerArray(field);
