@@ -42,7 +42,7 @@ public class RecipeOutputFixerList extends RecipeOutputFixer {
 						RecipeFixer.onRecipeOutputReplaced((ItemStack) output, newStack);
 					}
 				} else {
-					for (RecipeOutputFixer recipeOutputFixer : RecipeOutputFixer.getRecipeOutputFixers(output.getClass())) {
+					for (RecipeOutputFixer recipeOutputFixer : RecipeOutputFixers.getRecipeOutputFixers(output.getClass())) {
 						recipeOutputFixer.fixRecipeOutput(recipe, output);
 					}
 				}

@@ -47,7 +47,7 @@ public class RecipeFixer {
 				}
 			}
 		} else {
-			for (RecipeOutputFixer recipeOutputFixer : RecipeOutputFixer.getRecipeOutputFixers(recipe.getClass())) {
+			for (RecipeOutputFixer recipeOutputFixer : RecipeOutputFixers.getRecipeOutputFixers(recipe.getClass())) {
 				recipeOutputFixer.fixRecipeOutput(recipe, recipe);
 			}
 		}
