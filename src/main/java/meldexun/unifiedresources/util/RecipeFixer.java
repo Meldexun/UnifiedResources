@@ -25,6 +25,7 @@ public class RecipeFixer {
 			recipesChecked = 0;
 			outputsUpdated = 0;
 			long t = System.currentTimeMillis();
+			ItemReplacer.loadUnificationRules();
 			for (IRecipe<?> recipe : server.getRecipeManager().getRecipes()) {
 				RecipeFixer.fixRecipe(recipe);
 				recipesChecked++;

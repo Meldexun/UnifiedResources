@@ -1,0 +1,26 @@
+{
+  "rules": [
+    {
+      "originalItemFilters": [
+        ".*"
+      ],
+      "originalTagFilters": [
+        "forge:dusts/.*",
+        "forge:gems/.*",
+        "forge:ingots/.*",
+        "forge:nuggets/.*",
+        "forge:ores/.*",
+        "forge:rods/.*",
+        "forge:storage_blocks/.*"
+      ],
+      "replacementItemFilters": [
+        ".*"
+      ]
+    }
+  ],
+  "ignoredItemFilters": [],
+  "ignoredTagFilters": [
+    "forge:rods/all_metal"
+  ],
+  "debug": false
+}

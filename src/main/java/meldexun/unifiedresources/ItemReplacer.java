@@ -1,39 +1,142 @@
 package meldexun.unifiedresources;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.Reader;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import javax.annotation.Nullable;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import meldexun.unifiedresources.config.UnifiedResourcesConfig;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+
+import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.CompoundNBT;
-import net.minecraft.tags.ITag;
-import net.minecraft.tags.ITagCollection;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.util.ResourceLocation;
 
 public class ItemReplacer {
 
 	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Path UNIFICATION_RULES_FILE = Paths.get("config/" + UnifiedResources.MODID + ".json");
+	private static final Gson GSON = new Gson();
+	private static final List<UnificationRule> UNIFICATION_RULES = new ArrayList<>();
+	private static final List<Predicate<Item>> IGNORED_ITEM_FILTERS = new ArrayList<>();
+	private static final List<Predicate<ResourceLocation>> IGNORED_TAG_FILTERS = new ArrayList<>();
+	private static final Map<Item, Item> REPLACEMENT_CACHE = new Reference2ReferenceOpenHashMap<>();
 	private static final Field FIELD_capNBT;
 	static {
 		try {
 			FIELD_capNBT = ItemStack.class.getDeclaredField("capNBT");
 			FIELD_capNBT.setAccessible(true);
 		} catch (Exception e) {
-			throw new RuntimeException(e);
+			throw new UnsupportedOperationException("Failed to find capNBT field", e);
 		}
 	}
-	public static final Map<ITag<Item>, List<Item>> TAG_2_SORTED_VALUES_MAP = new ConcurrentHashMap<>();
+
+	private static boolean debug;
+
+	public static void loadUnificationRules() {
+		REPLACEMENT_CACHE.clear();
+		UNIFICATION_RULES.clear();
+		IGNORED_ITEM_FILTERS.clear();
+		IGNORED_TAG_FILTERS.clear();
+
+		if (!Files.exists(UNIFICATION_RULES_FILE)) {
+			try {
+				Files.createDirectories(UNIFICATION_RULES_FILE.getParent());
+				try (InputStream in = new BufferedInputStream(ItemReplacer.class.getResourceAsStream("/config/" + UnifiedResources.MODID + ".json"));
+						OutputStream out = new BufferedOutputStream(Files.newOutputStream(UNIFICATION_RULES_FILE))) {
+					int b;
+					while ((b = in.read()) != -1) {
+						out.write(b);
+					}
+				}
+			} catch (IOException e) {
+				LOGGER.error("Failed copying default config from mod jar into config folder {}", UNIFICATION_RULES_FILE, e);
+			}
+		}
+
+		JsonObject unificationRulesJson;
+		try (Reader reader = new InputStreamReader(new BufferedInputStream(Files.newInputStream(UNIFICATION_RULES_FILE)))) {
+			unificationRulesJson = GSON.fromJson(reader, JsonObject.class);
+		} catch (IOException e) {
+			LOGGER.error("Failed reading config file {}", UNIFICATION_RULES_FILE, e);
+			return;
+		}
+
+		ItemReplacer.<JsonObject>stream(unificationRulesJson.getAsJsonArray("rules"))
+				.map(rule -> {
+					List<Predicate<Item>> originalItemFilters = ItemReplacer.parseResourceLocationFilters(rule.getAsJsonArray("originalItemFilters"))
+							.map(predicate -> ItemReplacer.mapThenTest(predicate, Item::getRegistryName))
+							.collect(Collectors.toList());
+					List<Predicate<ResourceLocation>> originalTagFilters = ItemReplacer.parseResourceLocationFilters(rule.getAsJsonArray("originalTagFilters"))
+							.collect(Collectors.toList());
+					List<Predicate<Item>> replacementItemFilters = ItemReplacer.parseResourceLocationFilters(rule.getAsJsonArray("replacementItemFilters"))
+							.map(predicate -> ItemReplacer.mapThenTest(predicate, Item::getRegistryName))
+							.collect(Collectors.toList());
+					return new UnificationRule(originalItemFilters, originalTagFilters, replacementItemFilters);
+				})
+				.forEach(UNIFICATION_RULES::add);
+
+		ItemReplacer.stream(unificationRulesJson.getAsJsonArray("ignoredItemFilters"))
+				.map(ItemReplacer::parseResourceLocationFilter)
+				.map(predicate -> ItemReplacer.mapThenTest(predicate, Item::getRegistryName))
+				.forEach(IGNORED_ITEM_FILTERS::add);
+
+		ItemReplacer.stream(unificationRulesJson.getAsJsonArray("ignoredTagFilters"))
+				.map(ItemReplacer::parseResourceLocationFilter)
+				.forEach(IGNORED_TAG_FILTERS::add);
+
+		debug = unificationRulesJson.has("debug") && unificationRulesJson.get("debug")
+				.getAsBoolean();
+	}
+
+	@SuppressWarnings("unchecked")
+	private static <T extends JsonElement> Stream<T> stream(JsonArray jsonArray) {
+		return StreamSupport.stream(jsonArray.spliterator(), false)
+				.map(e -> (T) e);
+	}
+
+	private static Stream<Predicate<ResourceLocation>> parseResourceLocationFilters(JsonArray array) {
+		return Stream.of(array)
+				.filter(Objects::nonNull)
+				.<JsonElement>flatMap(ItemReplacer::stream)
+				.map(ItemReplacer::parseResourceLocationFilter);
+	}
+
+	private static Predicate<ResourceLocation> parseResourceLocationFilter(JsonElement regexJson) {
+		return ItemReplacer.mapThenTest(Pattern.compile(regexJson.getAsString())
+				.asPredicate(), ResourceLocation::toString);
+	}
+
+	private static <T, R> Predicate<R> mapThenTest(Predicate<T> predicate, Function<R, T> mappingFunction) {
+		return t -> predicate.test(mappingFunction.apply(t));
+	}
 
 	@Nullable
 	public static ItemStack getReplacement(ItemStack stack) {
@@ -49,54 +152,41 @@ public class ItemReplacer {
 
 	@Nullable
 	public static Item getReplacement(Item item) {
-		Set<ResourceLocation> itemTags = item.getTags();
-		List<? extends String> tagsToUnify = UnifiedResourcesConfig.SERVER_CONFIG.tagsToUnify.get();
-		List<? extends String> tagsToIgnore = UnifiedResourcesConfig.SERVER_CONFIG.tagsToIgnore.get();
-
-		for (ResourceLocation itemTag : itemTags) {
-			String s = itemTag.toString();
-			for (String s1 : tagsToUnify) {
-				if (s.startsWith(s1) && !tagsToIgnore.contains(s)) {
-					ITagCollection<Item> allTags = ItemTags.getAllTags();
-					ITag<Item> tag = allTags.getTag(itemTag);
-					Item newItem = ItemReplacer.getReplacement(tag);
-
-					if (newItem != null) {
-						return newItem;
+		return REPLACEMENT_CACHE.computeIfAbsent(item, k -> {
+			if (IGNORED_ITEM_FILTERS.stream()
+					.anyMatch(ignoredItemFilter -> ignoredItemFilter.test(item))) {
+				return null;
+			}
+			for (UnificationRule rule : UNIFICATION_RULES) {
+				if (rule.getOriginalItemFilters()
+						.stream()
+						.noneMatch(originalItemFilter -> originalItemFilter.test(item))) {
+					continue;
+				}
+				for (Predicate<ResourceLocation> originalTagFilter : rule.getOriginalTagFilters()) {
+					for (ResourceLocation tag : item.getTags()) {
+						if (IGNORED_TAG_FILTERS.stream()
+								.anyMatch(ignoredTagFilter -> ignoredTagFilter.test(tag))) {
+							continue;
+						}
+						if (!originalTagFilter.test(tag)) {
+							continue;
+						}
+						for (Predicate<Item> replacementItemFilter : rule.getReplacementItemFilters()) {
+							for (Item tagItem : ItemTags.getAllTags()
+									.getTag(tag)
+									.getValues()) {
+								if (!replacementItemFilter.test(tagItem)) {
+									continue;
+								}
+								return tagItem;
+							}
+						}
 					}
 				}
 			}
-		}
-
-		return null;
-	}
-
-	@Nullable
-	public static Item getReplacement(ITag<Item> tag) {
-		List<Item> values = TAG_2_SORTED_VALUES_MAP.computeIfAbsent(tag, key -> {
-			List<? extends String> priorityModIds = UnifiedResourcesConfig.SERVER_CONFIG.modPriority.get();
-			List<Item> sortedValues = new ArrayList<>(tag.getValues());
-			sortedValues.sort((item1, item2) -> {
-				ResourceLocation registryName1 = item1.getRegistryName();
-				ResourceLocation registryName2 = item2.getRegistryName();
-				int i1 = priorityModIds.indexOf(registryName1.getNamespace());
-				int i2 = priorityModIds.indexOf(registryName2.getNamespace());
-				if (i1 != -1 && (i2 == -1 || i1 < i2)) {
-					return -1;
-				}
-				if (i2 != -1 && (i1 == -1 || i2 < i1)) {
-					return 1;
-				}
-				return item1.getRegistryName().compareNamespaced(item2.getRegistryName());
-			});
-			return sortedValues;
-		});
-
-		if (values.isEmpty()) {
 			return null;
-		}
-
-		return values.get(0);
+		});
 	}
 
 	@Nullable
@@ -104,7 +194,7 @@ public class ItemReplacer {
 		try {
 			return (CompoundNBT) FIELD_capNBT.get(stack);
 		} catch (ReflectiveOperationException e) {
-			throw new RuntimeException(e);
+			throw new UnsupportedOperationException("Failed to get capNBT field", e);
 		}
 	}
 
@@ -113,7 +203,7 @@ public class ItemReplacer {
 	}
 
 	public static void onItemReplaced(String type, Item oldItem, Item newItem) {
-		if (UnifiedResourcesConfig.SERVER_CONFIG.debug.get()) {
+		if (debug) {
 			LOGGER.info("{}: Replaced {} with {}", type, oldItem.getRegistryName(), newItem.getRegistryName());
 		}
 	}
