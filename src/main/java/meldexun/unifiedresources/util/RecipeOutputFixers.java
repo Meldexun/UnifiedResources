@@ -10,31 +10,34 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
 public class RecipeOutputFixers {
 
-	private static final Map<Class<?>, List<RecipeOutputFixer>> RECIPE_CLASS_2_RECIPE_OUTPUT_FIXERS = new HashMap<>();
+	private static final Logger LOGGER = LogManager.getLogger();
+	private static final Map<Class<?>, List<RecipeOutputFixer>> RECIPE_OUTPUT_FIXERS = new HashMap<>();
 
 	public static List<RecipeOutputFixer> getRecipeOutputFixers(Class<?> classToCheck) {
-		if (RECIPE_CLASS_2_RECIPE_OUTPUT_FIXERS.containsKey(classToCheck)) {
-			return RECIPE_CLASS_2_RECIPE_OUTPUT_FIXERS.get(classToCheck);
+		if (RECIPE_OUTPUT_FIXERS.containsKey(classToCheck)) {
+			return RECIPE_OUTPUT_FIXERS.get(classToCheck);
 		}
-		ArrayList<RecipeOutputFixer> list = new ArrayList<>();
+		ArrayList<RecipeOutputFixer> recipeOutputFixerList = new ArrayList<>();
 		if (classToCheck != Object.class) {
 			for (Field field : classToCheck.getDeclaredFields()) {
 				RecipeOutputFixer recipeOutputFixer = RecipeOutputFixers.create(field);
 				if (recipeOutputFixer != null) {
-					list.add(recipeOutputFixer);
+					recipeOutputFixerList.add(recipeOutputFixer);
 				}
 			}
-			list.addAll(RecipeOutputFixers.getRecipeOutputFixers(classToCheck.getSuperclass()));
+			recipeOutputFixerList.addAll(RecipeOutputFixers.getRecipeOutputFixers(classToCheck.getSuperclass()));
 		}
-		list.trimToSize();
-		RECIPE_CLASS_2_RECIPE_OUTPUT_FIXERS.put(classToCheck, list);
-		return list;
+		recipeOutputFixerList.trimToSize();
+		RECIPE_OUTPUT_FIXERS.put(classToCheck, recipeOutputFixerList);
+		return recipeOutputFixerList;
 	}
 
 	@Nullable
@@ -49,34 +52,25 @@ public class RecipeOutputFixers {
 
 		Class<?> type = field.getType();
 
-		if (type == Item.class) {
-			try {
+		try {
+			if (type == Item.class) {
 				field.setAccessible(true);
 				return new RecipeOutputFixerItem(field);
-			} catch (Exception e) {
-				e.printStackTrace();
 			}
-		} else if (type == ItemStack.class) {
-			try {
+			if (type == ItemStack.class) {
 				field.setAccessible(true);
 				return new RecipeOutputFixerItemStack(field);
-			} catch (Exception e) {
-				e.printStackTrace();
 			}
-		} else if (type.isArray() && !type.getComponentType().isPrimitive()) {
-			try {
+			if (type.isArray() && !type.getComponentType().isPrimitive()) {
 				field.setAccessible(true);
 				return new RecipeOutputFixerArray(field);
-			} catch (Exception e) {
-				e.printStackTrace();
 			}
-		} else if (List.class.isAssignableFrom(type)) {
-			try {
+			if (List.class.isAssignableFrom(type)) {
 				field.setAccessible(true);
 				return new RecipeOutputFixerList(field);
-			} catch (Exception e) {
-				e.printStackTrace();
 			}
+		} catch (Exception e) {
+			LOGGER.error("Failed creating recipe output fixer for field: {} {} {}", field.getDeclaringClass(), field.getName(), type, e);
 		}
 
 		return null;

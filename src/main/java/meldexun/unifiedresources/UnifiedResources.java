@@ -16,6 +16,7 @@ import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig.Type;
 import net.minecraftforge.fml.event.server.FMLServerAboutToStartEvent;
+import net.minecraftforge.fml.server.ServerLifecycleHooks;
 
 @Mod(UnifiedResources.MODID)
 public class UnifiedResources {
@@ -36,12 +37,12 @@ public class UnifiedResources {
 
 	@SubscribeEvent(priority = EventPriority.LOWEST)
 	public void onTagsUpdatedEvent(TagsUpdatedEvent.CustomTagTypes event) {
-		RecipeFixer.checkRecipes();
+		RecipeFixer.checkRecipes(ServerLifecycleHooks.getCurrentServer());
 	}
 
 	@SubscribeEvent(priority = EventPriority.LOWEST)
 	public void onServerAboutToStartEvent(FMLServerAboutToStartEvent event) {
-		RecipeFixer.checkRecipes();
+		RecipeFixer.checkRecipes(ServerLifecycleHooks.getCurrentServer());
 	}
 
 	@SubscribeEvent(priority = EventPriority.LOWEST)

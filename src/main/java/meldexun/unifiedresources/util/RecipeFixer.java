@@ -9,17 +9,15 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.server.MinecraftServer;
-import net.minecraftforge.fml.server.ServerLifecycleHooks;
 
 public class RecipeFixer {
 
 	private static final Logger LOGGER = LogManager.getLogger();
 
-	public static int recipesChecked = 0;
-	public static int outputsUpdated = 0;
+	private static int recipesChecked = 0;
+	private static int outputsUpdated = 0;
 
-	public static void checkRecipes() {
-		MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+	public static void checkRecipes(MinecraftServer server) {
 		if (server == null) {
 			return;
 		}
