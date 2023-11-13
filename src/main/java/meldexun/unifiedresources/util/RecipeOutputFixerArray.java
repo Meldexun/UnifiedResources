@@ -1,12 +1,12 @@
 package meldexun.unifiedresources.util;
 
 import java.lang.reflect.Field;
-import java.util.List;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import meldexun.unifiedresources.UnifiedResources;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.IRecipe;
 
@@ -21,27 +21,27 @@ public class RecipeOutputFixerArray extends RecipeOutputFixer {
 	@Override
 	public void fixRecipeOutput(IRecipe<?> recipe, Object scope) {
 		try {
-			Object[] stacks = (Object[]) this.field.get(scope);
-			if (stacks == null) {
+			Object[] outputs = (Object[]) this.field.get(scope);
+			if (outputs == null) {
 				return;
 			}
-			if (stacks.length == 0) {
-				return;
-			}
-			if (stacks[0].getClass() != ItemStack.class) {
-				for (Object obj1 : stacks) {
-					List<RecipeOutputFixer> recipeOutputFixers = RecipeOutputFixer.getRecipeOutputFixers(obj1.getClass());
-					for (RecipeOutputFixer recipeOutputFixer : recipeOutputFixers) {
-						recipeOutputFixer.fixRecipeOutput(recipe, obj1);
+			for (int i = 0; i < outputs.length; i++) {
+				Object output = outputs[i];
+				if (Item.class.equals(output.getClass())) {
+					Item newItem = UnifiedResources.getReplacement((Item) output);
+					if (newItem != null) {
+						outputs[i] = newItem;
+						RecipeFixer.onRecipeOutputReplaced((Item) output, newItem);
 					}
-				}
-			} else {
-				for (int i = 0; i < stacks.length; i++) {
-					ItemStack stack = (ItemStack) stacks[i];
-					ItemStack newStack = UnifiedResources.getReplacement(stack);
+				} else if (ItemStack.class.equals(output.getClass())) {
+					ItemStack newStack = UnifiedResources.getReplacement((ItemStack) output);
 					if (newStack != null) {
-						stacks[i] = newStack;
-						RecipeFixer.onRecipeOutputReplaced(stack, newStack);
+						outputs[i] = newStack;
+						RecipeFixer.onRecipeOutputReplaced((ItemStack) output, newStack);
+					}
+				} else {
+					for (RecipeOutputFixer recipeOutputFixer : RecipeOutputFixer.getRecipeOutputFixers(output.getClass())) {
+						recipeOutputFixer.fixRecipeOutput(recipe, output);
 					}
 				}
 			}
