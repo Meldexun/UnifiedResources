@@ -28,7 +28,7 @@ public class RecipeOutputFixerItemStack extends RecipeOutputFixer {
 			ItemStack newStack = UnifiedResources.getReplacement(stack);
 			if (newStack != null) {
 				this.field.set(obj, newStack);
-				UnifiedResources.outputsUpdated++;
+				RecipeFixer.outputsUpdated++;
 				if (UnifiedResourcesConfig.SERVER_CONFIG.debug.get()) {
 					LOGGER.info("Recipe: Replaced {} with {} in {}", stack.getItem().getRegistryName(), newStack.getItem().getRegistryName(), recipe.getId());
 				}

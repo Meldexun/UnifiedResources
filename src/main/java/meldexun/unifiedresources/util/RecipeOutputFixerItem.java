@@ -28,7 +28,7 @@ public class RecipeOutputFixerItem extends RecipeOutputFixer {
 			Item newItem = UnifiedResources.getReplacement(item);
 			if (newItem != null) {
 				this.field.set(obj, newItem);
-				UnifiedResources.outputsUpdated++;
+				RecipeFixer.outputsUpdated++;
 				if (UnifiedResourcesConfig.SERVER_CONFIG.debug.get()) {
 					LOGGER.info("Recipe: Replaced {} with {} in {}", item.getItem().getRegistryName(), newItem.getItem().getRegistryName(), recipe.getId());
 				}
