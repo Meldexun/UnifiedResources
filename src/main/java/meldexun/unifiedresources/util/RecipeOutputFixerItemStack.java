@@ -18,15 +18,15 @@ public class RecipeOutputFixerItemStack extends RecipeOutputFixer {
 	}
 
 	@Override
-	public void fixRecipeOutput(IRecipe<?> recipe, Object obj) {
+	public void fixRecipeOutput(IRecipe<?> recipe, Object scope) {
 		try {
-			ItemStack stack = (ItemStack) this.field.get(obj);
+			ItemStack stack = (ItemStack) this.field.get(scope);
 			if (stack == null) {
 				return;
 			}
 			ItemStack newStack = UnifiedResources.getReplacement(stack);
 			if (newStack != null) {
-				this.field.set(obj, newStack);
+				this.field.set(scope, newStack);
 				RecipeFixer.onRecipeOutputReplaced(stack, newStack);
 			}
 		} catch (Exception e) {

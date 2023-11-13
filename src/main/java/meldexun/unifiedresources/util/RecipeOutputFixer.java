@@ -24,7 +24,7 @@ public abstract class RecipeOutputFixer {
 		this.field = field;
 	}
 
-	public abstract void fixRecipeOutput(IRecipe<?> recipe, Object obj);
+	public abstract void fixRecipeOutput(IRecipe<?> recipe, Object scope);
 
 	public static List<RecipeOutputFixer> getRecipeOutputFixers(Class<?> classToCheck) {
 		if (RECIPE_CLASS_2_RECIPE_OUTPUT_FIXERS.containsKey(classToCheck)) {

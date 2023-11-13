@@ -20,9 +20,9 @@ public class RecipeOutputFixerList extends RecipeOutputFixer {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public void fixRecipeOutput(IRecipe<?> recipe, Object obj) {
+	public void fixRecipeOutput(IRecipe<?> recipe, Object scope) {
 		try {
-			List<Object> stacks = (List<Object>) this.field.get(obj);
+			List<Object> stacks = (List<Object>) this.field.get(scope);
 			if (stacks == null) {
 				return;
 			}

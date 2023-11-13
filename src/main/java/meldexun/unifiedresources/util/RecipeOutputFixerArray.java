@@ -19,9 +19,9 @@ public class RecipeOutputFixerArray extends RecipeOutputFixer {
 	}
 
 	@Override
-	public void fixRecipeOutput(IRecipe<?> recipe, Object obj) {
+	public void fixRecipeOutput(IRecipe<?> recipe, Object scope) {
 		try {
-			Object[] stacks = (Object[]) this.field.get(obj);
+			Object[] stacks = (Object[]) this.field.get(scope);
 			if (stacks == null) {
 				return;
 			}

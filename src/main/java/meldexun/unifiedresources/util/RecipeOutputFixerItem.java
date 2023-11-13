@@ -18,15 +18,15 @@ public class RecipeOutputFixerItem extends RecipeOutputFixer {
 	}
 
 	@Override
-	public void fixRecipeOutput(IRecipe<?> recipe, Object obj) {
+	public void fixRecipeOutput(IRecipe<?> recipe, Object scope) {
 		try {
-			Item item = (Item) this.field.get(obj);
+			Item item = (Item) this.field.get(scope);
 			if (item == null) {
 				return;
 			}
 			Item newItem = UnifiedResources.getReplacement(item);
 			if (newItem != null) {
-				this.field.set(obj, newItem);
+				this.field.set(scope, newItem);
 				RecipeFixer.onRecipeOutputReplaced(item, newItem);
 			}
 		} catch (Exception e) {
