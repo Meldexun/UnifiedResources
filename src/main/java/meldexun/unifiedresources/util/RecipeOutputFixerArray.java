@@ -7,7 +7,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import meldexun.unifiedresources.UnifiedResources;
-import meldexun.unifiedresources.config.UnifiedResourcesConfig;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.IRecipe;
 
@@ -42,10 +41,7 @@ public class RecipeOutputFixerArray extends RecipeOutputFixer {
 					ItemStack newStack = UnifiedResources.getReplacement(stack);
 					if (newStack != null) {
 						stacks[i] = newStack;
-						RecipeFixer.outputsUpdated++;
-						if (UnifiedResourcesConfig.SERVER_CONFIG.debug.get()) {
-							LOGGER.info("Recipe: Replaced {} with {} in {}", stack.getItem().getRegistryName(), newStack.getItem().getRegistryName(), recipe.getId());
-						}
+						RecipeFixer.onRecipeOutputReplaced(stack, newStack);
 					}
 				}
 			}

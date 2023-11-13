@@ -5,7 +5,7 @@ import org.apache.logging.log4j.Logger;
 
 import meldexun.unifiedresources.UnifiedResources;
 import meldexun.unifiedresources.api.IRecipeMutableResult;
-import meldexun.unifiedresources.config.UnifiedResourcesConfig;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.server.MinecraftServer;
@@ -43,10 +43,7 @@ public class RecipeFixer {
 
 				if (newStack != null) {
 					((IRecipeMutableResult) recipe).setResultItem(newStack, i);
-					outputsUpdated++;
-					if (UnifiedResourcesConfig.SERVER_CONFIG.debug.get()) {
-						LOGGER.info("Recipe: Replaced {} with {} in {}", stack.getItem().getRegistryName(), newStack.getItem().getRegistryName(), recipe.getId());
-					}
+					RecipeFixer.onRecipeOutputReplaced(stack, newStack);
 				}
 			}
 		} else {
@@ -54,6 +51,15 @@ public class RecipeFixer {
 				recipeOutputFixer.fixRecipeOutput(recipe, recipe);
 			}
 		}
+	}
+
+	public static void onRecipeOutputReplaced(ItemStack oldStack, ItemStack newStack) {
+		RecipeFixer.onRecipeOutputReplaced(oldStack.getItem(), newStack.getItem());
+	}
+
+	public static void onRecipeOutputReplaced(Item oldItem, Item newItem) {
+		outputsUpdated++;
+		UnifiedResources.onItemReplaced("Recipe", oldItem, newItem);
 	}
 
 }

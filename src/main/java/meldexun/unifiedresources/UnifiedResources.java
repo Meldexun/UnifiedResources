@@ -79,9 +79,7 @@ public class UnifiedResources {
 
 		if (newStack != null) {
 			itemEntity.setItem(newStack);
-			if (UnifiedResourcesConfig.SERVER_CONFIG.debug.get()) {
-				LOGGER.info("ItemEntity: Replaced {} with {}", stack.getItem().getRegistryName(), newStack.getItem().getRegistryName());
-			}
+			UnifiedResources.onItemReplaced("ItemEntity", stack, newStack);
 		}
 	}
 
@@ -147,6 +145,16 @@ public class UnifiedResources {
 		}
 
 		return values.get(0);
+	}
+
+	public static void onItemReplaced(String type, ItemStack oldStack, ItemStack newStack) {
+		onItemReplaced(type, oldStack.getItem(), newStack.getItem());
+	}
+
+	public static void onItemReplaced(String type, Item oldItem, Item newItem) {
+		if (UnifiedResourcesConfig.SERVER_CONFIG.debug.get()) {
+			LOGGER.info("{}: Replaced {} with {}", type, oldItem.getRegistryName(), newItem.getRegistryName());
+		}
 	}
 
 }
