@@ -5,7 +5,7 @@ import java.lang.reflect.Field;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import meldexun.unifiedresources.UnifiedResources;
+import meldexun.unifiedresources.ItemReplacer;
 import net.minecraft.item.Item;
 import net.minecraft.item.crafting.IRecipe;
 
@@ -24,7 +24,7 @@ public class RecipeOutputFixerItem extends RecipeOutputFixer {
 			if (item == null) {
 				return;
 			}
-			Item newItem = UnifiedResources.getReplacement(item);
+			Item newItem = ItemReplacer.getReplacement(item);
 			if (newItem != null) {
 				this.field.set(scope, newItem);
 				RecipeFixer.onRecipeOutputReplaced(item, newItem);

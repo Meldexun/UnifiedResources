@@ -6,7 +6,7 @@ import java.util.List;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import meldexun.unifiedresources.UnifiedResources;
+import meldexun.unifiedresources.ItemReplacer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.IRecipe;
@@ -30,13 +30,13 @@ public class RecipeOutputFixerList extends RecipeOutputFixer {
 			for (int i = 0; i < outputs.size(); i++) {
 				Object output = outputs.get(i);
 				if (Item.class.equals(output.getClass())) {
-					Item newItem = UnifiedResources.getReplacement((Item) output);
+					Item newItem = ItemReplacer.getReplacement((Item) output);
 					if (newItem != null) {
 						outputs.set(i, newItem);
 						RecipeFixer.onRecipeOutputReplaced((Item) output, newItem);
 					}
 				} else if (ItemStack.class.equals(output.getClass())) {
-					ItemStack newStack = UnifiedResources.getReplacement((ItemStack) output);
+					ItemStack newStack = ItemReplacer.getReplacement((ItemStack) output);
 					if (newStack != null) {
 						outputs.set(i, newStack);
 						RecipeFixer.onRecipeOutputReplaced((ItemStack) output, newStack);

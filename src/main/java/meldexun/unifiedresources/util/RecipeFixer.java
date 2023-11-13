@@ -3,7 +3,7 @@ package meldexun.unifiedresources.util;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import meldexun.unifiedresources.UnifiedResources;
+import meldexun.unifiedresources.ItemReplacer;
 import meldexun.unifiedresources.api.IRecipeMutableResult;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -39,7 +39,7 @@ public class RecipeFixer {
 		if (recipe instanceof IRecipeMutableResult) {
 			for (int i = 0; i < ((IRecipeMutableResult) recipe).getResultItemCount(); i++) {
 				ItemStack stack = ((IRecipeMutableResult) recipe).getResultItem(i);
-				ItemStack newStack = UnifiedResources.getReplacement(stack);
+				ItemStack newStack = ItemReplacer.getReplacement(stack);
 
 				if (newStack != null) {
 					((IRecipeMutableResult) recipe).setResultItem(newStack, i);
@@ -59,7 +59,7 @@ public class RecipeFixer {
 
 	public static void onRecipeOutputReplaced(Item oldItem, Item newItem) {
 		outputsUpdated++;
-		UnifiedResources.onItemReplaced("Recipe", oldItem, newItem);
+		ItemReplacer.onItemReplaced("Recipe", oldItem, newItem);
 	}
 
 }
