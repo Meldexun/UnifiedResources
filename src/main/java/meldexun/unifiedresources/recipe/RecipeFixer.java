@@ -1,5 +1,7 @@
 package meldexun.unifiedresources.recipe;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -14,27 +16,23 @@ public class RecipeFixer {
 
 	private static final Logger LOGGER = LogManager.getLogger();
 
-	private static int recipesChecked = 0;
-	private static int outputsUpdated = 0;
+	private static AtomicInteger recipesChecked = new AtomicInteger();
+	private static AtomicInteger outputsUpdated = new AtomicInteger();
 
-	public static void checkRecipes(MinecraftServer server) {
-		if (server == null) {
-			return;
-		}
-		synchronized (server) {
-			recipesChecked = 0;
-			outputsUpdated = 0;
-			long t = System.currentTimeMillis();
-			ItemReplacer.loadUnificationRules();
-			for (IRecipe<?> recipe : server.getRecipeManager().getRecipes()) {
-				RecipeFixer.fixRecipe(recipe);
-				recipesChecked++;
-			}
-			LOGGER.info("Checking {} recipes and unifying {} outputs took {} milliseconds", recipesChecked, outputsUpdated, System.currentTimeMillis() - t);
-		}
+	public synchronized static void checkRecipes(MinecraftServer server) {
+		long time = System.currentTimeMillis();
+		ItemReplacer.loadUnificationRules();
+		recipesChecked.set(0);
+		outputsUpdated.set(0);
+		server.getRecipeManager()
+				.getRecipes()
+				.parallelStream()
+				.forEach(RecipeFixer::checkRecipe);
+		time = System.currentTimeMillis() - time;
+		LOGGER.info("Checking {} recipes and unifying {} outputs took {} milliseconds", recipesChecked, outputsUpdated, time);
 	}
 
-	private static void fixRecipe(IRecipe<?> recipe) {
+	private static void checkRecipe(IRecipe<?> recipe) {
 		if (recipe instanceof IRecipeMutableResult) {
 			for (int i = 0; i < ((IRecipeMutableResult) recipe).getResultItemCount(); i++) {
 				ItemStack stack = ((IRecipeMutableResult) recipe).getResultItem(i);
@@ -50,6 +48,7 @@ public class RecipeFixer {
 				recipeOutputFixer.fixRecipeOutput(recipe, recipe);
 			}
 		}
+		recipesChecked.getAndIncrement();
 	}
 
 	public static void onRecipeOutputReplaced(ItemStack oldStack, ItemStack newStack) {
@@ -57,7 +56,7 @@ public class RecipeFixer {
 	}
 
 	public static void onRecipeOutputReplaced(Item oldItem, Item newItem) {
-		outputsUpdated++;
+		outputsUpdated.getAndIncrement();
 		ItemReplacer.onItemReplaced("Recipe", oldItem, newItem);
 	}
 

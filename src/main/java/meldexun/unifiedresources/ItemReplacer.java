@@ -15,6 +15,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -32,7 +35,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.CompoundNBT;
@@ -44,10 +46,11 @@ public class ItemReplacer {
 	private static final Logger LOGGER = LogManager.getLogger();
 	private static final Path UNIFICATION_RULES_FILE = Paths.get("config/" + UnifiedResources.MODID + ".json");
 	private static final Gson GSON = new Gson();
+	private static final ReadWriteLock LOCK = new ReentrantReadWriteLock();
 	private static final List<UnificationRule> UNIFICATION_RULES = new ArrayList<>();
 	private static final List<Predicate<Item>> IGNORED_ITEM_FILTERS = new ArrayList<>();
 	private static final List<Predicate<ResourceLocation>> IGNORED_TAG_FILTERS = new ArrayList<>();
-	private static final Map<Item, Item> REPLACEMENT_CACHE = new Reference2ReferenceOpenHashMap<>();
+	private static final Map<Item, Item> REPLACEMENT_CACHE = new ConcurrentHashMap<>();
 	private static final Field FIELD_capNBT;
 	static {
 		try {
@@ -61,11 +64,6 @@ public class ItemReplacer {
 	private static boolean debug;
 
 	public static void loadUnificationRules() {
-		REPLACEMENT_CACHE.clear();
-		UNIFICATION_RULES.clear();
-		IGNORED_ITEM_FILTERS.clear();
-		IGNORED_TAG_FILTERS.clear();
-
 		if (!Files.exists(UNIFICATION_RULES_FILE)) {
 			try {
 				Files.createDirectories(UNIFICATION_RULES_FILE.getParent());
@@ -89,7 +87,7 @@ public class ItemReplacer {
 			return;
 		}
 
-		ItemReplacer.<JsonObject>stream(unificationRulesJson.getAsJsonArray("rules"))
+		List<UnificationRule> newUnificationRules = ItemReplacer.<JsonObject>stream(unificationRulesJson.getAsJsonArray("rules"))
 				.map(rule -> {
 					List<Predicate<Item>> originalItemFilters = ItemReplacer.parseResourceLocationFilters(rule.getAsJsonArray("originalItemFilters"))
 							.map(predicate -> ItemReplacer.mapThenTest(predicate, Item::getRegistryName))
@@ -101,19 +99,33 @@ public class ItemReplacer {
 							.collect(Collectors.toList());
 					return new UnificationRule(originalItemFilters, originalTagFilters, replacementItemFilters);
 				})
-				.forEach(UNIFICATION_RULES::add);
+				.collect(Collectors.toList());
 
-		ItemReplacer.stream(unificationRulesJson.getAsJsonArray("ignoredItemFilters"))
+		List<Predicate<Item>> newIgnoredItemFilters = ItemReplacer.stream(unificationRulesJson.getAsJsonArray("ignoredItemFilters"))
 				.map(ItemReplacer::parseResourceLocationFilter)
 				.map(predicate -> ItemReplacer.mapThenTest(predicate, Item::getRegistryName))
-				.forEach(IGNORED_ITEM_FILTERS::add);
+				.collect(Collectors.toList());
 
-		ItemReplacer.stream(unificationRulesJson.getAsJsonArray("ignoredTagFilters"))
+		List<Predicate<ResourceLocation>> newIgnoredTagFilters = ItemReplacer.stream(unificationRulesJson.getAsJsonArray("ignoredTagFilters"))
 				.map(ItemReplacer::parseResourceLocationFilter)
-				.forEach(IGNORED_TAG_FILTERS::add);
+				.collect(Collectors.toList());
 
-		debug = unificationRulesJson.has("debug") && unificationRulesJson.get("debug")
-				.getAsBoolean();
+		LOCK.writeLock().lock();
+		try {
+			REPLACEMENT_CACHE.clear();
+			UNIFICATION_RULES.clear();
+			IGNORED_ITEM_FILTERS.clear();
+			IGNORED_TAG_FILTERS.clear();
+
+			UNIFICATION_RULES.addAll(newUnificationRules);
+			IGNORED_ITEM_FILTERS.addAll(newIgnoredItemFilters);
+			IGNORED_TAG_FILTERS.addAll(newIgnoredTagFilters);
+
+			debug = unificationRulesJson.has("debug") && unificationRulesJson.get("debug")
+					.getAsBoolean();
+		} finally {
+			LOCK.writeLock().unlock();
+		}
 	}
 
 	@SuppressWarnings("unchecked")
@@ -152,41 +164,46 @@ public class ItemReplacer {
 
 	@Nullable
 	public static Item getReplacement(Item item) {
-		return REPLACEMENT_CACHE.computeIfAbsent(item, k -> {
-			if (IGNORED_ITEM_FILTERS.stream()
-					.anyMatch(ignoredItemFilter -> ignoredItemFilter.test(item))) {
-				return null;
-			}
-			for (UnificationRule rule : UNIFICATION_RULES) {
-				if (rule.getOriginalItemFilters()
-						.stream()
-						.noneMatch(originalItemFilter -> originalItemFilter.test(item))) {
-					continue;
+		LOCK.readLock().lock();
+		try {
+			return REPLACEMENT_CACHE.computeIfAbsent(item, k -> {
+				if (IGNORED_ITEM_FILTERS.stream()
+						.anyMatch(ignoredItemFilter -> ignoredItemFilter.test(item))) {
+					return null;
 				}
-				for (Predicate<ResourceLocation> originalTagFilter : rule.getOriginalTagFilters()) {
-					for (ResourceLocation tag : item.getTags()) {
-						if (IGNORED_TAG_FILTERS.stream()
-								.anyMatch(ignoredTagFilter -> ignoredTagFilter.test(tag))) {
-							continue;
-						}
-						if (!originalTagFilter.test(tag)) {
-							continue;
-						}
-						for (Predicate<Item> replacementItemFilter : rule.getReplacementItemFilters()) {
-							for (Item tagItem : ItemTags.getAllTags()
-									.getTag(tag)
-									.getValues()) {
-								if (!replacementItemFilter.test(tagItem)) {
-									continue;
+				for (UnificationRule rule : UNIFICATION_RULES) {
+					if (rule.getOriginalItemFilters()
+							.stream()
+							.noneMatch(originalItemFilter -> originalItemFilter.test(item))) {
+						continue;
+					}
+					for (Predicate<ResourceLocation> originalTagFilter : rule.getOriginalTagFilters()) {
+						for (ResourceLocation tag : item.getTags()) {
+							if (IGNORED_TAG_FILTERS.stream()
+									.anyMatch(ignoredTagFilter -> ignoredTagFilter.test(tag))) {
+								continue;
+							}
+							if (!originalTagFilter.test(tag)) {
+								continue;
+							}
+							for (Predicate<Item> replacementItemFilter : rule.getReplacementItemFilters()) {
+								for (Item tagItem : ItemTags.getAllTags()
+										.getTag(tag)
+										.getValues()) {
+									if (!replacementItemFilter.test(tagItem)) {
+										continue;
+									}
+									return tagItem;
 								}
-								return tagItem;
 							}
 						}
 					}
 				}
-			}
-			return null;
-		});
+				return null;
+			});
+		} finally {
+			LOCK.readLock().unlock();
+		}
 	}
 
 	@Nullable
