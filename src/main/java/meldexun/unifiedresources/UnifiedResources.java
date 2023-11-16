@@ -1,6 +1,6 @@
 package meldexun.unifiedresources;
 
-import meldexun.unifiedresources.util.RecipeFixer;
+import meldexun.unifiedresources.recipe.RecipeFixer;
 import net.minecraft.entity.item.ItemEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.common.MinecraftForge;

@@ -1,7 +1,6 @@
-package meldexun.unifiedresources.util;
+package meldexun.unifiedresources.recipe;
 
 import java.lang.reflect.Field;
-import java.util.List;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -11,34 +10,33 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.IRecipe;
 
-public class RecipeOutputFixerList extends RecipeOutputFixer {
+public class RecipeOutputFixerArray extends RecipeOutputFixer {
 
 	private static final Logger LOGGER = LogManager.getLogger();
 
-	public RecipeOutputFixerList(Field field) {
+	public RecipeOutputFixerArray(Field field) {
 		super(field);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public void fixRecipeOutput(IRecipe<?> recipe, Object scope) {
 		try {
-			List<Object> outputs = (List<Object>) this.field.get(scope);
+			Object[] outputs = (Object[]) this.field.get(scope);
 			if (outputs == null) {
 				return;
 			}
-			for (int i = 0; i < outputs.size(); i++) {
-				Object output = outputs.get(i);
+			for (int i = 0; i < outputs.length; i++) {
+				Object output = outputs[i];
 				if (Item.class.equals(output.getClass())) {
 					Item newItem = ItemReplacer.getReplacement((Item) output);
 					if (newItem != null) {
-						outputs.set(i, newItem);
+						outputs[i] = newItem;
 						RecipeFixer.onRecipeOutputReplaced((Item) output, newItem);
 					}
 				} else if (ItemStack.class.equals(output.getClass())) {
 					ItemStack newStack = ItemReplacer.getReplacement((ItemStack) output);
 					if (newStack != null) {
-						outputs.set(i, newStack);
+						outputs[i] = newStack;
 						RecipeFixer.onRecipeOutputReplaced((ItemStack) output, newStack);
 					}
 				} else {

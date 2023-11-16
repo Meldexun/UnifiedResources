@@ -1,4 +1,4 @@
-package meldexun.unifiedresources.util;
+package meldexun.unifiedresources.recipe;
 
 import java.lang.reflect.Field;
 
