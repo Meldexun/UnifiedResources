@@ -11,7 +11,6 @@ import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -21,9 +20,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+import java.util.regex.PatternSyntaxException;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import javax.annotation.Nullable;
 
@@ -35,10 +33,12 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import meldexun.unifiedresources.util.CollectorUtil;
+import meldexun.unifiedresources.util.JsonUtil;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.CompoundNBT;
-import net.minecraft.tags.ItemTags;
 import net.minecraft.util.ResourceLocation;
 
 public class ItemReplacer {
@@ -47,9 +47,9 @@ public class ItemReplacer {
 	private static final Path UNIFICATION_RULES_FILE = Paths.get("config/" + UnifiedResources.MODID + ".json");
 	private static final Gson GSON = new Gson();
 	private static final ReadWriteLock LOCK = new ReentrantReadWriteLock();
-	private static final List<UnificationRule> UNIFICATION_RULES = new ArrayList<>();
-	private static final List<Predicate<Item>> IGNORED_ITEM_FILTERS = new ArrayList<>();
-	private static final List<Predicate<ResourceLocation>> IGNORED_TAG_FILTERS = new ArrayList<>();
+	private static final List<UnificationRule> UNIFICATION_RULES = new ObjectArrayList<>();
+	private static final List<Predicate<Item>> IGNORED_ITEM_FILTERS = new ObjectArrayList<>();
+	private static final List<Predicate<ResourceLocation>> IGNORED_TAG_FILTERS = new ObjectArrayList<>();
 	private static final Map<Item, Item> REPLACEMENT_CACHE = new ConcurrentHashMap<>();
 	private static final Field FIELD_capNBT;
 	static {
@@ -87,28 +87,22 @@ public class ItemReplacer {
 			return;
 		}
 
-		List<UnificationRule> newUnificationRules = ItemReplacer.<JsonObject>stream(unificationRulesJson.getAsJsonArray("rules"))
-				.map(rule -> {
-					List<Predicate<Item>> originalItemFilters = ItemReplacer.parseResourceLocationFilters(rule.getAsJsonArray("originalItemFilters"))
-							.map(predicate -> ItemReplacer.mapThenTest(predicate, Item::getRegistryName))
-							.collect(Collectors.toList());
-					List<Predicate<ResourceLocation>> originalTagFilters = ItemReplacer.parseResourceLocationFilters(rule.getAsJsonArray("originalTagFilters"))
-							.collect(Collectors.toList());
-					List<Predicate<Item>> replacementItemFilters = ItemReplacer.parseResourceLocationFilters(rule.getAsJsonArray("replacementItemFilters"))
-							.map(predicate -> ItemReplacer.mapThenTest(predicate, Item::getRegistryName))
-							.collect(Collectors.toList());
-					return new UnificationRule(originalItemFilters, originalTagFilters, replacementItemFilters);
-				})
-				.collect(Collectors.toList());
-
-		List<Predicate<Item>> newIgnoredItemFilters = ItemReplacer.stream(unificationRulesJson.getAsJsonArray("ignoredItemFilters"))
-				.map(ItemReplacer::parseResourceLocationFilter)
-				.map(predicate -> ItemReplacer.mapThenTest(predicate, Item::getRegistryName))
-				.collect(Collectors.toList());
-
-		List<Predicate<ResourceLocation>> newIgnoredTagFilters = ItemReplacer.stream(unificationRulesJson.getAsJsonArray("ignoredTagFilters"))
-				.map(ItemReplacer::parseResourceLocationFilter)
-				.collect(Collectors.toList());
+		List<UnificationRule> newUnificationRules;
+		List<Predicate<Item>> newIgnoredItemFilters;
+		List<Predicate<ResourceLocation>> newIgnoredTagFilters;
+		try {
+			newUnificationRules = JsonUtil.<JsonObject>stream(unificationRulesJson.getAsJsonArray("rules"))
+					.map(UnificationRule::parseUnificationRule)
+					.collect(CollectorUtil.toObjList());
+			newIgnoredItemFilters = ItemReplacer.parseFilters(unificationRulesJson.getAsJsonArray("ignoredItemFilters"))
+					.map(filter -> ItemReplacer.mapThenTest(filter, Item::getRegistryName))
+					.collect(CollectorUtil.toObjList());
+			newIgnoredTagFilters = ItemReplacer.parseFilters(unificationRulesJson.getAsJsonArray("ignoredTagFilters"))
+					.collect(CollectorUtil.toObjList());
+		} catch (PatternSyntaxException e) {
+			LOGGER.error("Failed parsing unification rules", e);
+			return;
+		}
 
 		LOCK.writeLock().lock();
 		try {
@@ -121,32 +115,23 @@ public class ItemReplacer {
 			IGNORED_ITEM_FILTERS.addAll(newIgnoredItemFilters);
 			IGNORED_TAG_FILTERS.addAll(newIgnoredTagFilters);
 
-			debug = unificationRulesJson.has("debug") && unificationRulesJson.get("debug")
-					.getAsBoolean();
+			debug = unificationRulesJson.has("debug") && unificationRulesJson.get("debug").getAsBoolean();
 		} finally {
 			LOCK.writeLock().unlock();
 		}
 	}
 
-	@SuppressWarnings("unchecked")
-	private static <T extends JsonElement> Stream<T> stream(JsonArray jsonArray) {
-		return StreamSupport.stream(jsonArray.spliterator(), false)
-				.map(e -> (T) e);
-	}
-
-	private static Stream<Predicate<ResourceLocation>> parseResourceLocationFilters(JsonArray array) {
+	public static Stream<Predicate<ResourceLocation>> parseFilters(JsonArray array) {
 		return Stream.of(array)
 				.filter(Objects::nonNull)
-				.<JsonElement>flatMap(ItemReplacer::stream)
-				.map(ItemReplacer::parseResourceLocationFilter);
+				.<JsonElement>flatMap(JsonUtil::stream)
+				.map(JsonElement::getAsString)
+				.map(Pattern::compile)
+				.map(Pattern::asPredicate)
+				.map(filter -> ItemReplacer.mapThenTest(filter, ResourceLocation::toString));
 	}
 
-	private static Predicate<ResourceLocation> parseResourceLocationFilter(JsonElement regexJson) {
-		return ItemReplacer.mapThenTest(Pattern.compile(regexJson.getAsString())
-				.asPredicate(), ResourceLocation::toString);
-	}
-
-	private static <T, R> Predicate<R> mapThenTest(Predicate<T> predicate, Function<R, T> mappingFunction) {
+	public static <T, R> Predicate<R> mapThenTest(Predicate<T> predicate, Function<R, T> mappingFunction) {
 		return t -> predicate.test(mappingFunction.apply(t));
 	}
 
@@ -172,31 +157,9 @@ public class ItemReplacer {
 					return null;
 				}
 				for (UnificationRule rule : UNIFICATION_RULES) {
-					if (rule.getOriginalItemFilters()
-							.stream()
-							.noneMatch(originalItemFilter -> originalItemFilter.test(item))) {
-						continue;
-					}
-					for (Predicate<ResourceLocation> originalTagFilter : rule.getOriginalTagFilters()) {
-						for (ResourceLocation tag : item.getTags()) {
-							if (IGNORED_TAG_FILTERS.stream()
-									.anyMatch(ignoredTagFilter -> ignoredTagFilter.test(tag))) {
-								continue;
-							}
-							if (!originalTagFilter.test(tag)) {
-								continue;
-							}
-							for (Predicate<Item> replacementItemFilter : rule.getReplacementItemFilters()) {
-								for (Item tagItem : ItemTags.getAllTags()
-										.getTag(tag)
-										.getValues()) {
-									if (!replacementItemFilter.test(tagItem)) {
-										continue;
-									}
-									return tagItem;
-								}
-							}
-						}
+					Item r = rule.findReplacement(k, IGNORED_TAG_FILTERS);
+					if (r != null) {
+						return r;
 					}
 				}
 				return null;
