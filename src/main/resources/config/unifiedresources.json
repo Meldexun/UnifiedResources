@@ -1,20 +1,20 @@
 {
   "rules": [
     {
-      "originalItemFilters": [
-        ".*"
-      ],
       "originalTagFilters": [
-        "forge:dusts/.*",
-        "forge:gems/.*",
-        "forge:ingots/.*",
-        "forge:nuggets/.*",
-        "forge:ores/.*",
-        "forge:rods/.*",
-        "forge:storage_blocks/.*"
+        "forge:dusts/*",
+        "forge:gems/*",
+        "forge:ingots/*",
+        "forge:nuggets/*",
+        "forge:ores/*",
+        "forge:rods/*",
+        "forge:storage_blocks/*"
+      ],
+      "originalItemFilters": [
+        "*"
       ],
       "replacementItemFilters": [
-        ".*"
+        "*"
       ]
     }
   ],

@@ -18,8 +18,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Stream;
 
@@ -34,6 +32,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import meldexun.unifiedresources.pattern.SplittingPattern;
 import meldexun.unifiedresources.util.CollectorUtil;
 import meldexun.unifiedresources.util.JsonUtil;
 import net.minecraft.item.Item;
@@ -48,8 +47,8 @@ public class ItemReplacer {
 	private static final Gson GSON = new Gson();
 	private static final ReadWriteLock LOCK = new ReentrantReadWriteLock();
 	private static final List<UnificationRule> UNIFICATION_RULES = new ObjectArrayList<>();
-	private static final List<Predicate<Item>> IGNORED_ITEM_FILTERS = new ObjectArrayList<>();
-	private static final List<Predicate<ResourceLocation>> IGNORED_TAG_FILTERS = new ObjectArrayList<>();
+	private static final List<SplittingPattern<Item>> IGNORED_ITEM_FILTERS = new ObjectArrayList<>();
+	private static final List<SplittingPattern<ResourceLocation>> IGNORED_TAG_FILTERS = new ObjectArrayList<>();
 	private static final Map<Item, Item> REPLACEMENT_CACHE = new ConcurrentHashMap<>();
 	private static final Field FIELD_capNBT;
 	static {
@@ -88,17 +87,14 @@ public class ItemReplacer {
 		}
 
 		List<UnificationRule> newUnificationRules;
-		List<Predicate<Item>> newIgnoredItemFilters;
-		List<Predicate<ResourceLocation>> newIgnoredTagFilters;
+		List<SplittingPattern<Item>> newIgnoredItemFilters;
+		List<SplittingPattern<ResourceLocation>> newIgnoredTagFilters;
 		try {
 			newUnificationRules = JsonUtil.<JsonObject>stream(unificationRulesJson.getAsJsonArray("rules"))
 					.map(UnificationRule::parseUnificationRule)
 					.collect(CollectorUtil.toObjList());
-			newIgnoredItemFilters = ItemReplacer.parseFilters(unificationRulesJson.getAsJsonArray("ignoredItemFilters"))
-					.map(filter -> ItemReplacer.mapThenTest(filter, Item::getRegistryName))
-					.collect(CollectorUtil.toObjList());
-			newIgnoredTagFilters = ItemReplacer.parseFilters(unificationRulesJson.getAsJsonArray("ignoredTagFilters"))
-					.collect(CollectorUtil.toObjList());
+			newIgnoredItemFilters = ItemReplacer.parseItemFilters(unificationRulesJson.getAsJsonArray("ignoredItemFilters"));
+			newIgnoredTagFilters = ItemReplacer.parseTagFilters(unificationRulesJson.getAsJsonArray("ignoredTagFilters"));
 		} catch (PatternSyntaxException e) {
 			LOGGER.error("Failed parsing unification rules", e);
 			return;
@@ -121,18 +117,21 @@ public class ItemReplacer {
 		}
 	}
 
-	public static Stream<Predicate<ResourceLocation>> parseFilters(JsonArray array) {
+	public static List<SplittingPattern<Item>> parseItemFilters(JsonArray array) throws PatternSyntaxException {
+		return ItemReplacer.parseFilters(array, ((Function<ResourceLocation, CharSequence>) ResourceLocation::toString).compose(Item::getRegistryName));
+	}
+
+	public static List<SplittingPattern<ResourceLocation>> parseTagFilters(JsonArray array) throws PatternSyntaxException {
+		return ItemReplacer.parseFilters(array, ResourceLocation::toString);
+	}
+
+	public static <T> List<SplittingPattern<T>> parseFilters(JsonArray array, Function<T, CharSequence> inputPreprocessor) throws PatternSyntaxException {
 		return Stream.of(array)
 				.filter(Objects::nonNull)
 				.<JsonElement>flatMap(JsonUtil::stream)
 				.map(JsonElement::getAsString)
-				.map(Pattern::compile)
-				.map(Pattern::asPredicate)
-				.map(filter -> ItemReplacer.mapThenTest(filter, ResourceLocation::toString));
-	}
-
-	public static <T, R> Predicate<R> mapThenTest(Predicate<T> predicate, Function<R, T> mappingFunction) {
-		return t -> predicate.test(mappingFunction.apply(t));
+				.map(pattern -> SplittingPattern.compile(pattern, inputPreprocessor))
+				.collect(CollectorUtil.toObjList());
 	}
 
 	@Nullable
@@ -152,17 +151,11 @@ public class ItemReplacer {
 		LOCK.readLock().lock();
 		try {
 			return REPLACEMENT_CACHE.computeIfAbsent(item, k -> {
-				if (IGNORED_ITEM_FILTERS.stream()
-						.anyMatch(ignoredItemFilter -> ignoredItemFilter.test(item))) {
+				Item newItem = UnificationRule.findReplacement(k, UNIFICATION_RULES, IGNORED_ITEM_FILTERS, IGNORED_TAG_FILTERS);
+				if (newItem == null || newItem == k) {
 					return null;
 				}
-				for (UnificationRule rule : UNIFICATION_RULES) {
-					Item r = rule.findReplacement(k, IGNORED_TAG_FILTERS);
-					if (r != null) {
-						return r;
-					}
-				}
-				return null;
+				return newItem;
 			});
 		} finally {
 			LOCK.readLock().unlock();
