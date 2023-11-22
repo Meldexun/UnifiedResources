@@ -20,7 +20,8 @@
   ],
   "ignoredItemFilters": [],
   "ignoredTagFilters": [
-    "forge:rods/all_metal"
+    "forge:rods/all_metal",
+    "forge:gems/certus_quartz"
   ],
   "debug": false
 }
