@@ -2,6 +2,30 @@
   "rules": [
     {
       "originalTagFilters": [
+        "forge:ores*/?{tag}[/]"
+      ],
+      "originalItemFilters": [
+        "*:?{type}_#{tag}_ore",
+        "*:#{tag}_?{type}_ore"
+      ],
+      "replacementItemFilters": [
+        "*:#{type}_#{tag}_ore",
+        "*:#{tag}_#{type}_ore"
+      ]
+    },
+    {
+      "originalTagFilters": [
+        "forge:ores*/?{tag}[/]"
+      ],
+      "originalItemFilters": [
+        "*:#{tag}_ore"
+      ],
+      "replacementItemFilters": [
+        "*:#{tag}_ore"
+      ]
+    },
+    {
+      "originalTagFilters": [
         "forge:dusts/*",
         "forge:gems/*",
         "forge:ingots/*",
