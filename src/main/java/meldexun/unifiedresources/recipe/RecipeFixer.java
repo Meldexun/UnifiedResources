@@ -1,5 +1,7 @@
 package meldexun.unifiedresources.recipe;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.logging.log4j.LogManager;
@@ -7,10 +9,12 @@ import org.apache.logging.log4j.Logger;
 
 import meldexun.unifiedresources.ItemReplacer;
 import meldexun.unifiedresources.api.IRecipeMutableResult;
+import meldexun.unifiedresources.util.CollectorUtil;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.IRecipe;
-import net.minecraft.server.MinecraftServer;
+import net.minecraft.item.crafting.IRecipeType;
+import net.minecraft.util.ResourceLocation;
 
 public class RecipeFixer {
 
@@ -19,13 +23,16 @@ public class RecipeFixer {
 	private static AtomicInteger recipesChecked = new AtomicInteger();
 	private static AtomicInteger outputsUpdated = new AtomicInteger();
 
-	public synchronized static void checkRecipes(MinecraftServer server) {
+	public synchronized static void checkRecipes(Map<IRecipeType<?>, Map<ResourceLocation, IRecipe<?>>> recipes) {
 		long time = System.currentTimeMillis();
 		ItemReplacer.loadUnificationRules();
 		recipesChecked.set(0);
 		outputsUpdated.set(0);
-		server.getRecipeManager()
-				.getRecipes()
+		recipes.values()
+				.stream()
+				.map(Map::values)
+				.flatMap(Collection::stream)
+				.collect(CollectorUtil.toObjList())
 				.parallelStream()
 				.forEach(RecipeFixer::checkRecipe);
 		time = System.currentTimeMillis() - time;

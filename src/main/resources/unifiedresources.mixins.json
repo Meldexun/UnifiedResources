@@ -1,0 +1,11 @@
+{
+    "required": true,
+    "package": "meldexun.unifiedresources.mixin",
+    "compatibilityLevel": "JAVA_8",
+    "refmap": "unifiedresources.refmap.json",
+    "mixins": [
+        "RecipeManagerMixin",
+        "ServerWorldMixin"
+    ],
+    "minVersion": "0.8"
+}
