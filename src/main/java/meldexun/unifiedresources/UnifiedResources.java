@@ -15,7 +15,7 @@ import net.minecraftforge.fml.server.ServerLifecycleHooks;
 @Mod(UnifiedResources.MODID)
 public class UnifiedResources {
 
-	public static final String MODID = "unified_resources";
+	public static final String MODID = "unifiedresources";
 
 	public UnifiedResources() {
 		MinecraftForge.EVENT_BUS.register(this);
