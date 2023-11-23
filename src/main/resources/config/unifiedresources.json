@@ -26,6 +26,7 @@
     },
     {
       "originalTagFilters": [
+        "forge:chunks/*",
         "forge:dusts/*",
         "forge:gems/*",
         "forge:ingots/*",
