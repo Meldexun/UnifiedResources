@@ -4,6 +4,7 @@
     "compatibilityLevel": "JAVA_8",
     "refmap": "unifiedresources.refmap.json",
     "mixins": [
+        "DataPackRegistriesMixin",
         "RecipeManagerMixin",
         "ServerWorldMixin"
     ],
